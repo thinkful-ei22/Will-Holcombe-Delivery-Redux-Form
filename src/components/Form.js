@@ -1,17 +1,102 @@
 'use strict';
 import React from 'react';
-import { reduxForm, Field } from 'redux-form';
+import { reduxForm, Field, focus } from 'redux-form';
 import {required, nonEmpty, numbersOnly, fiveChar } from './validators';
 import Input from './input';
+import {SubmissionError} from 'redux-form';
+//import {register} from '../actions';
 //<Field name="firstName" component="input" />
 // const DemoForm = () => { 
 //     return ( 
     //removed export
+
+    //this.props.dispatch(register(values)))}>
+
+    const URL = 'https://us-central1-delivery-form-api.cloudfunctions.net/api/report'
  class DemoForm extends React.Component { 
-        render() { 
+        
+
+// let returnedMessage = '';
+
+// if (this.props.submitSucceeded) {
+//     returnedMessage = <div className="message message-success">Report submitted successfully</div>
+// } else if (this.props.submitFailed) {
+//     returnedMessage = <div className="message message-error">Delivery not found</div>
+// } else {
+//     returnedMessage = '';
+// }
+onSubmit(values) {
+    return fetch(URL, {
+      method: 'POST',
+      body: JSON.stringify(values),
+      headers: {
+          'Content-Type': 'application/json'
+      }
+    })
+      .then(res => {
+        if (!res.ok) {
+            if (
+                res.headers.has('content-type') &&
+                res.headers
+                    .get('content-type')
+                    .startsWith('application/json')
+            ) {
+                // It's a nice JSON error returned by us, so decode it
+                return res.json().then(err => Promise.reject(err));
+            }
+            // It's a less informative error returned by express
+            return Promise.reject({
+                code: res.status,
+                message: res.statusText
+            });
+        }
+        return;
+    })
+    .then(() => console.log('Submitted with values', values))
+    .catch(err => {
+        const {reason, message, location} = err;
+        if (reason === 'ValidationError') {
+            // Convert ValidationErrors into SubmissionErrors for Redux Form
+            return Promise.reject(
+                new SubmissionError({
+                    [location]: message
+                })
+            );
+        }
+        return Promise.reject(
+            new SubmissionError({
+                _error: 'Error submitting message'
+            })
+        );
+    });
+  }
+  render() { 
+
+    let successMessage;
+    if (this.props.submitSucceeded) {
+        successMessage = (
+            <div className="message message-success">
+                Message submitted successfully
+            </div>
+        );
+    }
+
+    let errorMessage;
+    if (this.props.error) {
+        errorMessage = (
+            <div className="message message-error">
+              {this.props.error}
+            </div>
+        );
+    }
+//with this.props.handleSubmit(values => { 
+            //console.log('values', values)
+            //return register(values)//change to complaint) ?
+
             return ( 
-        <form onSubmit={this.props.handleSubmit(values => 
-            console.log(values))}>
+        <form onSubmit={this.props.handleSubmit(value => this.onSubmit(value))}>
+                {successMessage}
+                {errorMessage}
             <div className="form-input">
             <label htmlFor="tracking-number">Please enter your tracking number
                         </label>
@@ -58,10 +143,12 @@ import Input from './input';
         </form>
         );
     }
-    }
+}
 
 export default reduxForm({
     form: 'demo', 
-    initialValues: {issue: "not-delivered"}
+    initialValues: {issue: "not-delivered"},
+    onSubmitFail: (errors, dispatch) =>
+        dispatch(focus('delivery', Object.keys(errors)[0]))
 })(DemoForm)
 //every form in your application needs a unique form property value
